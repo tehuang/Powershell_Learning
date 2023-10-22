@@ -1,0 +1,352 @@
+==========
+Powershell
+==========
+> $PSVersionTable //check version
+> Get-Help <cmdlet-name>
+  e.g. > Get-Help Get-Process
+> Update-help //更新本地幫助系統
+> help *<keyword>* //模糊查詢
+  e.g. help *update*
+
+-full　//列出全部文檔
+-ShowWindow //透過圖形化顯示文檔
+------------
+[]: 可選參數  e.g. [Name]
+<>:必選參數  e.g. <string[]>
+------------
+---------------------------------
+Providers: Adapter, 相當於磁盤驅動
+---------------------------------
+>  Get-PSProvider //查看當前PS的種類
+
+Name                 Capabilities                                      Drives
+----                 ------------                                      ------
+Registry             ShouldProcess, Transactions                       {HKLM, HKCU}
+Alias                ShouldProcess                                     {Alias}
+Environment          ShouldProcess                                     {Env}
+FileSystem           Filter, ShouldProcess, Credentials                {C}
+Function             ShouldProcess                                     {Function}
+Variable             ShouldProcess                                     {Variable}
+
+- ShouldProcess 可支持-whatIf (模擬情境), -Confirm參數
+- Filter 支持 -Filter參數  (過濾出不需要的內容)
+- Credentials 支持憑據參數 (-Credentials) 連接數據庫  
+- Transactions 支持事務，提交操作
+
+> Get-PSDrive //查看當前已經連接的驅動器
+
+/* 查找與Item相關的命令 */ 
+> Get-ChildItem //獲得當前路徑底下的子目錄, 其實就是 ls
+  e.g. Get-ChildItem -path . -Filter *mongosh* -Recurse
+> Get-ItemProperty //獲取某項的屬性such as read/write
+  e.g. Get-ItemProperty -Path . -Name *
+> Set-location //cd
+  e.g. Set-Location C:
+> Set-ItemProperty //設置某項的屬性
+  e.g. Set-ItemProperty -path . -Name DontPrettyPath -value 1
+
+=================================================
+Pipeline: A 命令的結果，作為B命令的輸入。減少重複輸入
+=================================================
+> Get-Member //查看當前A命令輸出的類型，屬性，和方法等
+  e.g. Get-Service spooler | Get-Member
+
+---------------
+管道參數輸入類型:
+---------------
+1. ByValue : 一次只能有一個屬性參數接收管道返回的類型
+> Get-Content '.\services_name.txt' | start-service -pass
+ - 查看A的輸出類型
+ - 查看B的輸出類型
+ - 確定B接收參數的位置
+2. ByPropertyName: 可實現一次傳入多個參數類型，並且命令自動完成匹配
+> Import-csv aliases.csv | new-alias
+
+[Tips] AB命令同類，一般均能成功傳遞參數e.g. *-service(get-service, stop-service, start-service) 
+
+============
+Object in PS
+============
+Object: 命令執行後，輸出內容的每一行，就是一對象。表示單獨的一個事物，比如單個進程，單個服務。
+
+顯示指定屬性
+e.g. Get-Service | select -Property ServiceName, Status, DisplayName
+
+
+使用(對象)方法
+1. 找到指定服務
+   - 通過指定關鍵字的方式，查看該服務
+     e.g. Get-Service -DisplayName *spoo* 
+   - 通過管道過濾的方式，過濾出該服務
+     e.g. Get-Service | Where-Object -FilterScript {$_.name -like '*spoo*'} 
+2. 停止指定服務
+　 - 通過管道，連接stop-service命令，停止該服務
+　　　e.g. Get-Service -DisplayName *spoo* | Stop-Service 
+   - 使用對象方法，停止該服務
+　　　e.g. $print = Get-Service -DisplayName *spoo*
+           $print.stop()
+   - 直接使用對象方法，停止服務
+　　　e.g. (Get-Service -name spooler).Stop()
+
+====================================
+Comparison operators and ScriptBlock
+====================================
+------------------------------------------
+Comparison operators: compare values in PS
+------------------------------------------
+Equality: 
+- eq //equals
+  不區分大小寫: -eq
+  e.g. "string" -eq "STRING" //Result: True
+  區分大小寫: -ceq
+  e.g. "string" -ceq "STRING" //Result: False
+- nq //not equals
+- gt //greater than
+- ge //greater than or equal
+- lt //less than
+- le //less than or equal
+Matching: 
+- like 
+- notlike
+- match
+- notmatch
+Containment: 
+- contains
+- in
+- notin
+
+*單個值之間或單個值與多個值比較，輸出boolean
+ e.g. 1 -eq 1 //True
+      1 -eq 1,2 //False
+*多個和單個值比較，輸出滿足條件的值
+ e.g. 1,2,3 -eq 1 //1
+      1,2,3 -ne 1 //2,3
+
+-------------------------------------------------------
+ScriptBlocks: a collection of statements or expressions that can be used as a single unit. 
+--------------------------------------------------------
+分類：
+1. .NET框架命令下使用
+   e.g. Invoke-Command -ScriptBlock{Get-Service}
+2. 變量使用法
+   e.g. $var={get-service}
+        &$var
+3. 與比較符聯合使用
+   - where-object (-FilterScript)
+     e.g. Get-Process | Where-Object -FilterScript{$_ -like "*VM*"}
+   - ForEach-Object (-Process) 
+     e.g. Get-Process |foreach -Process{if($_ -like"*VM*"){$_.name}}
+   - Select-Pbject(自訂義屬性名稱)
+     e.g. Get-Process |Select-Object -Property ProcessName,{$_.StartTime.DayOfWeek}
+
+---------------------
+Modules of Powershell
+---------------------
+1. Find modules
+  > Help *x*
+  > Find-Module *x* //會在線查找第三方相關的modules
+2. Check commands of some module
+  > Get-Module -ListAvailable //查看當前可用的modules
+  > Get-Content Env:\PSModulePath //查看module的環境路徑
+  > Get-Command -Module <modulename>
+3. Import module
+  > Import-Module -name modulename
+4. Remove module
+  > Remove-Module -name modulename
+5. Install Module
+  > Install-Module modulename
+  > Install-Module modulename -RequiredVersion X.X.X //安裝指定版本
+6. Update Module
+  > Update-Module modulename
+7. Uninstall Module
+  > Uninstall-Module modulename
+  > Uninstall-Modeule modeulname_1, modeulname_2, modeulname_3 //刪除多個modules
+8. About Module
+  > help about_module
+
+======================
+Foreach-object command
+======================
+> 1..4 | ForEach-Object -Begin {"This is begin block"} -process {"This is process block"} -end {"This is end block"}
+  This is begin block
+  This is process block
+  This is process block
+  This is process block
+  This is process block
+  This is end block
+> 1..4 | ForEach-Object {"This is begin block"} {"This is process block"} {"This is end block"} //省略寫法
+> 1..4 | ForEach-Object {"I am the first block"} {"This is A block"} {"This is B block"} {"I am the last block"}
+  I am the first block
+  This is A block
+  This is B block
+  This is A block
+  This is B block
+  This is A block
+  This is B block
+  This is A block
+  This is B block
+  I am the last block
+-------------------------------------------------------------------------------------------------
+Case Study: copythe background image to the desktop folder and named it with the current datetime
+-------------------------------------------------------------------------------------------------
+> Get-ChildItem -Path "C:\Users\Teresa Huang\AppData\Local\Packages\Microsoft.Windows.ContentDeliveryManager_cw5n1h2txyewy\LocalState\Assets" | foreach -begin {$daytime=Get-Date -Format filedatetime | ForEach-Object{$_ -replace"T","_"}; $char="_"; $i=1;} -Process{Copy-Item $_.FullName "C:\Users\Teresa Huang\OneDrive - stevens.edu\Desktop\Background\$daytime$char$i.jpg";$i++} -end {Get-Date;"Completed"}
+
+================
+Input and Output
+================
+Input: 
+> $val = read-host "Please enter an input: "
+
+Output: 
+> Write-Host $val -ForegroundColor yellow -BackgroundColor magenta  //只能輸出結果
+> Write-Output $DIY_date | gm //輸出返回結果，可以傳遞給管道
+
+=================
+Formatting Output
+=================
+------------------
+Default Formatting
+------------------
+1. ".\DotNetTypes.format.ps1xml"文件。根據管道輸入內容，查找"Powershell Home"目錄下的文件是否定義了該類型的輸出格式
+2. "Types.ps1xml"文件 //如果上述沒找到，就去這個文件查找
+3. 確定輸出格式
+
+---------------------------
+Common Parameters for Table
+---------------------------
+Cmdlet | format-table -xxx
+ > - AutoSize //保證列有足夠空間，表格緊湊
+ e.g. Get-ChildItem | Format-Table -AutoSize
+ > - Property //選擇顯示的屬性，以逗號區隔
+ e.g. Get-ChildItem | Format-Table -Property Name, Length, LastAccessTime, LastWriteTime
+ > - groupBy //按指定屬性進行排序
+ e.g. Get-ChildItem | Format-Table -GroupBy LastWriteTime
+ > - wrap //不截斷列信息
+
+------------------------
+Customized table columns
+------------------------
+> @{name='xxx';expression={xxx}}
+  e.g. @{name='FileSize(MB)';expression={$_.Length / 1MB}}
+  e.g. Get-ChildItem | Format-Table -Property Name, @{name='FileSize(MB)';expression={$_.Length / 1MB}}
+  e.g.  Get-ChildItem | Format-Table -Property Name, @{name='FileSize(MB)';expression={$_.Length / 1MB -as [int]}} //用-as取整數
+  e.g. Get-ChildItem | Format-Table -Property Name, @{name='FileSize(KB)';expression={$_.Length / 1KB -as [int]}} -autosize
+
+-------------------------------------------------------------------------
+Common Parameters for 列表  //當attributes太多，表格容納不下，就會以列表呈現
+--------------------------------------------------------------------------
+> cmdlet | format-list-xxx
+  -property //選擇顯示的屬性
+   e.g. Get-ChildItem | Format-List -Property Name,Length,LastAccessTime
+  -groupby //按指定的屬性進行排序
+   e.g. Get-ChildItem | Format-List -groupby length
+
+-----------------------
+Customized list columns
+-----------------------
+跟Customized table columns一樣
+> @{name='xxx';expression={xxx}}
+  e.g. Get-ChildItem | Format-List -Property Name, @{name='FileSize(MB)';expression={$_.Length / 1MB}}
+
+=================
+Powershell Script
+=================
+特點:
+1. file extension '.ps1' //ps1 = powershell腳本1
+2. 可重複執行
+3. 可參數化
+4. 可添加說明文檔
+
+-----------------------
+Script Execution Policy
+-----------------------
+- AllSigned 經過受信任的CA設計的數字證書簽名之後的腳本
+- RemoteSigned 可以運行本地腳本，同時也可以執行受信任的CA簽發數字證書簽名之後的遠程腳本
+- Restricted(Default) 默認選項，不允許執行其他任何腳本
+- Unrestricted 可以運行所有腳本
+- Bypass忽略已配置好的執行策略
+
+> Get-ExecutionPolicy -list
+
+-----------------
+Script Parameters
+-----------------
+- 在腳本前面，添加param()
+- 設定變量，即參數(默認值)
+
+param(
+$DiyDate="2020.06.05"
+)
+Get-ChildItem -Path "C:\Users\Teresa Huang\AppData\Local\Packages\Microsoft.Windows.ContentDeliveryManager_cw5n1h2txyewy\LocalState\Assets" | where {$_.LastWriteTime -gt $DiyDate} |foreach -begin {$daytime=Get-Date -Format filedatetime | ForEach-Object{$_ -replace"T","_"}; $char="_"; $i=1;} -Process{Copy-Item $_.FullName "C:\Users\Teresa Huang\OneDrive - stevens.edu\Desktop\Background\$daytime$char$i.jpg";$i++} -end {Get-Date;"Completed"}
+
+-------------
+Script Helper
+-------------
+編寫方法
+ - 在腳本前面，添加<# #>
+ - 幫助文檔內容
+  .SYNOPSIS
+  .DESCRIPTION
+  .EXAMPLE
+e.g.
+<# 
+.SYNOPSIS
+copy and rename pictures
+.DESCRIPTION
+copy and rename pictures where....
+.EXAMPLE
+.\Copy_Rename_date.ps1 -DiyDate "2020.01.01"
+#>
+
+param(
+$DiyDate="2020.06.05"
+)
+Get-ChildItem -Path "C:\Users\Teresa Huang\AppData\Local\Packages\Microsoft.Windows.ContentDeliveryManager_cw5n1h2txyewy\LocalState\Assets" | where {$_.LastWriteTime -gt $DiyDate} |foreach -begin {$daytime=Get-Date -Format filedatetime | ForEach-Object{$_ -replace"T","_"}; $char="_"; $i=1;} -Process{Copy-Item $_.FullName "C:\Users\Teresa Huang\OneDrive - stevens.edu\Desktop\Background\$daytime$char$i.jpg";$i++} -end {Get-Date;"Completed"}
+
+調用方法
+ - Help .\...ps1[-full,-example,...]
+
+==============
+Remote Control
+==============
+1:1 連接
+ - Enter-PSSession
+   > Enter-PSSession -ComputerName localhost -Credential administrator\--
+1:N 連接
+ - Invoke-Command
+   > Invoke-Command -ComputerName localhost, hostB, hostC -Command{Get-Process} - Credential administrator\--
+
+===================
+Regular Expressions
+===================
+------------
+regex syntax
+------------
+\w //文字字符，字母數字以及下划線, 但不包含標點符號和空格
+\W //與\w相反，標點符號和空格
+\d //0~9的任意數字
+\D //任意非數字
+\s //任意空格字符，比如Tab,空格或者Enter
+\S //任何非空格字符
+[a-z] //a到z
+[a-f,m-z] //a到f, m到z
+[^abcde] //排除abcde
+
+-----------
+using regex
+-----------
+-match
+e.g. "powershell" -match "p[a-z]wershell"
+
+|Select-string -Pattern xxx
+e.g. |Select-string -Pattern "\d<1,3>.\d<1,3>.\d<1,3>.\d<1,3>" 
+
+==================================
+Script Block and Common Characters
+==================================
+先定義:
+$Exp = {Get-Service; get-acl}
+再調用:
+&$Exp
+
+輸入$Exp，只會打印出scriptblock內容，而非執行內容
